@@ -2518,7 +2518,8 @@ int avformat_find_stream_info(AVFormatContext *ic, AVDictionary **options)
              * the correct fps. */
             if (av_q2d(st->time_base) > 0.0005)
                 fps_analyze_framecount *= 2;
-            if (!tb_unreliable(sti->avctx))
+            // flv has pts/dts, no need fps analyzation
+            if (!tb_unreliable(sti->avctx) || !strcmp(ic->iformat->name, "flv"))
                 fps_analyze_framecount = 0;
             if (ic->fps_probe_size >= 0)
                 fps_analyze_framecount = ic->fps_probe_size;
@@ -2551,6 +2552,7 @@ int avformat_find_stream_info(AVFormatContext *ic, AVDictionary **options)
         analyzed_all_streams = 0;
         if (!missing_streams || !*missing_streams)
             if (i == ic->nb_streams) {
+                av_log(ic, AV_LOG_DEBUG, "Got all streams. nb_streams=%d, framecount=%d\n", ic->nb_streams, count);
                 analyzed_all_streams = 1;
                 /* NOTE: If the format has no header, then we need to read some
                  * packets to get most of the streams, so we cannot stop here. */

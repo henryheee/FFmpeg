@@ -71,7 +71,7 @@ AVDictionary *swr_opts;
 AVDictionary *format_opts, *codec_opts;
 
 static FILE *report_file;
-static int report_file_level = AV_LOG_DEBUG;
+static int report_file_level = AV_LOG_TRACE;
 int hide_banner = 0;
 
 enum show_muxdemuxers {

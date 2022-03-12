@@ -2210,8 +2210,10 @@ static int append_flv_data(RTMPContext *rt, RTMPPacket *pkt, int skip)
     uint32_t ts         = pkt->timestamp;
 
     if (pkt->type == RTMP_PT_AUDIO) {
+        if(!rt->has_audio) av_log(rt, AV_LOG_DEBUG, "rtmp recv audio\n");
         rt->has_audio = 1;
     } else if (pkt->type == RTMP_PT_VIDEO) {
+        if(!rt->has_video) av_log(rt, AV_LOG_DEBUG, "rtmp recv video\n");
         rt->has_video = 1;
     }
 
@@ -2247,14 +2249,23 @@ static int handle_notify(URLContext *s, RTMPPacket *pkt)
                            &stringlen))
         return AVERROR_INVALIDDATA;
 
+    av_log(s, AV_LOG_DEBUG, "rtmp handle notify: %s\n", commandbuffer);
+
     if (!strcmp(commandbuffer, "onMetaData")) {
-        // metadata properties should be stored in a mixed array
-        if (bytestream2_get_byte(&gbc) == AMF_DATA_TYPE_MIXEDARRAY) {
+        unsigned int amf_type = bytestream2_get_byte(&gbc);
+        av_log(s, AV_LOG_DEBUG, "rtmp: metadata type: %d\n", amf_type);
+        // metadata properties should be stored in a mixed array or object
+        if (amf_type == AMF_DATA_TYPE_MIXEDARRAY || amf_type == AMF_DATA_TYPE_OBJECT) {
             // We have found a metaData Array so flv can determine the streams
             // from this.
             rt->received_metadata = 1;
-            // skip 32-bit max array index
-            bytestream2_skip(&gbc, 4);
+            // ecma array have 32-bit array count
+            if(amf_type == AMF_DATA_TYPE_MIXEDARRAY)
+            {
+                // skip 32-bit max array index
+                bytestream2_skip(&gbc, 4);
+            }
+            
             while (bytestream2_get_bytes_left(&gbc) > 3) {
                 if (ff_amf_get_string(&gbc, statusmsg, sizeof(statusmsg),
                                       &stringlen))
@@ -2268,9 +2279,11 @@ static int handle_notify(URLContext *s, RTMPPacket *pkt)
                 // The presence of the following properties indicates that the
                 // respective streams are present.
                 if (!strcmp(statusmsg, "videocodecid")) {
+                    av_log(s, AV_LOG_DEBUG, "rtmp: metadata videocodecid\n");
                     rt->has_video = 1;
                 }
                 if (!strcmp(statusmsg, "audiocodecid")) {
+                    av_log(s, AV_LOG_DEBUG, "rtmp: metadata audiocodecid\n");
                     rt->has_audio = 1;
                 }
             }
@@ -2846,10 +2859,12 @@ reconnect:
         // build the FLV header from this. If we do not receive any metadata,
         // the FLV decoder will allocate the needed streams when their first
         // audio or video packet arrives.
-        while (!rt->has_audio && !rt->has_video && !rt->received_metadata) {
+        while (!rt->has_audio && !rt->has_video) {
             if ((ret = get_packet(s, 0)) < 0)
                goto fail;
         }
+
+        av_log(s, AV_LOG_DEBUG, "rtmp_open: has_audio:%d,has_video:%d\n",rt->has_audio,rt->has_video);
 
         // Either after we have read the metadata or (if there is none) the
         // first packet of an A/V stream, we have a better knowledge about the

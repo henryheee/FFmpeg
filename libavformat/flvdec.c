@@ -166,13 +166,20 @@ static AVStream *create_stream(AVFormatContext *s, int codec_type)
     AVStream *st = avformat_new_stream(s, NULL);
     if (!st)
         return NULL;
+
+    av_log(s, AV_LOG_INFO, "create_stream: type: %d, nb_streams: %d\n", codec_type, s->nb_streams);
+
     st->codecpar->codec_type = codec_type;
     if (s->nb_streams>=3 ||(   s->nb_streams==2
                            && s->streams[0]->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE
                            && s->streams[1]->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE
                            && s->streams[0]->codecpar->codec_type != AVMEDIA_TYPE_DATA
                            && s->streams[1]->codecpar->codec_type != AVMEDIA_TYPE_DATA))
+    {
+        av_log(s, AV_LOG_INFO, "create_stream: find 2 streams. clean AVFMTCTX_NOHEADER\n");
         s->ctx_flags &= ~AVFMTCTX_NOHEADER;
+    }
+    
     if (codec_type == AVMEDIA_TYPE_AUDIO) {
         st->codecpar->bit_rate = flv->audio_bit_rate;
         flv->missing_streams &= ~FLV_HEADER_FLAG_HASAUDIO;
@@ -321,6 +328,8 @@ static int flv_same_video_codec(AVCodecParameters *vpar, int flags)
         return vpar->codec_id == AV_CODEC_ID_VP6A;
     case FLV_CODECID_H264:
         return vpar->codec_id == AV_CODEC_ID_H264;
+    case FLV_CODECID_H265:
+        return vpar->codec_id == AV_CODEC_ID_H265;
     default:
         return vpar->codec_tag == flv_codecid;
     }
@@ -364,6 +373,11 @@ static int flv_set_video_codec(AVFormatContext *s, AVStream *vstream,
         break;
     case FLV_CODECID_H264:
         par->codec_id = AV_CODEC_ID_H264;
+        vstreami->need_parsing = AVSTREAM_PARSE_HEADERS;
+        ret = 3;     // not 4, reading packet type will consume one byte
+        break;
+    case FLV_CODECID_H265:
+        par->codec_id = AV_CODEC_ID_H265;
         vstreami->need_parsing = AVSTREAM_PARSE_HEADERS;
         ret = 3;     // not 4, reading packet type will consume one byte
         break;
@@ -517,6 +531,8 @@ static int amf_parse_object(AVFormatContext *s, AVStream *astream,
         return AVERROR_EOF;
     amf_type = avio_r8(ioc);
 
+    av_log(s, AV_LOG_TRACE, "amf_parse_object: type:%d key:%s\n",(int)amf_type,key);
+
     switch (amf_type) {
     case AMF_DATA_TYPE_NUMBER:
         num_val = av_int2double(avio_rb64(ioc));
@@ -658,7 +674,10 @@ static int amf_parse_object(AVFormatContext *s, AVStream *astream,
         if (amf_type == AMF_DATA_TYPE_OBJECT && s->nb_streams == 1 &&
            ((!apar && !strcmp(key, "audiocodecid")) ||
             (!vpar && !strcmp(key, "videocodecid"))))
+            {
+                av_log(s, AV_LOG_DEBUG, "onMetadata: clean AVFMTCTX_NOHEADER. key=%s",key);
                 s->ctx_flags &= ~AVFMTCTX_NOHEADER; //If there is either audio/video missing, codecid will be an empty object
+            }
 
         if ((!strcmp(key, "duration")        ||
             !strcmp(key, "filesize")        ||
@@ -777,7 +796,17 @@ static int flv_read_header(AVFormatContext *s)
 
     flv->missing_streams = flags & (FLV_HEADER_FLAG_HASVIDEO | FLV_HEADER_FLAG_HASAUDIO);
 
-    s->ctx_flags |= AVFMTCTX_NOHEADER;
+    int hasvideo = flags & FLV_HEADER_FLAG_HASVIDEO;
+    int hasaudio = flags & FLV_HEADER_FLAG_HASAUDIO;
+
+    av_log(s, AV_LOG_INFO, "flv_read_header: hasvideo:%d,hasaudio:%d\n", !!hasvideo, !!hasaudio);
+
+    /* always clear AVFMTCTX_NOHEADER. because:
+     * 1. flv tag can be header
+     * 2. this flag duplicates to audio/video flag in flv header
+     */
+    //s->ctx_flags |= AVFMTCTX_NOHEADER;
+    s->ctx_flags &= ~AVFMTCTX_NOHEADER;
 
     offset = avio_rb32(s->pb);
     avio_seek(s->pb, offset, SEEK_SET);
@@ -1243,6 +1272,7 @@ retry_duration:
 
     if (st->codecpar->codec_id == AV_CODEC_ID_AAC ||
         st->codecpar->codec_id == AV_CODEC_ID_H264 ||
+        st->codecpar->codec_id == AV_CODEC_ID_H265 ||
         st->codecpar->codec_id == AV_CODEC_ID_MPEG4) {
         int type = avio_r8(s->pb);
         size--;
@@ -1252,7 +1282,7 @@ retry_duration:
             goto leave;
         }
 
-        if (st->codecpar->codec_id == AV_CODEC_ID_H264 || st->codecpar->codec_id == AV_CODEC_ID_MPEG4) {
+        if (st->codecpar->codec_id == AV_CODEC_ID_H264 || st->codecpar->codec_id == AV_CODEC_ID_H265 || st->codecpar->codec_id == AV_CODEC_ID_MPEG4) {
             // sign extension
             int32_t cts = (avio_rb24(s->pb) + 0xff800000) ^ 0xff800000;
             pts = av_sat_add64(dts, cts);
@@ -1268,8 +1298,10 @@ retry_duration:
             }
         }
         if (type == 0 && (!st->codecpar->extradata || st->codecpar->codec_id == AV_CODEC_ID_AAC ||
-            st->codecpar->codec_id == AV_CODEC_ID_H264)) {
+            st->codecpar->codec_id == AV_CODEC_ID_H264 || st->codecpar->codec_id == AV_CODEC_ID_H265)) {
             AVDictionaryEntry *t;
+
+            av_log(s, AV_LOG_DEBUG,"flv_read_packet: set header:%d\n", st->codecpar->codec_id);
 
             if (st->codecpar->extradata) {
                 if ((ret = flv_queue_extradata(flv, s->pb, stream_type, size)) < 0)
@@ -1304,6 +1336,7 @@ retry_duration:
     pkt->stream_index = st->index;
     pkt->pos          = pos;
     if (flv->new_extradata[stream_type]) {
+        av_log(s, AV_LOG_DEBUG,"flv_read_packet: new new_extradata for stream type:%d\n", stream_type);
         int ret = av_packet_add_side_data(pkt, AV_PKT_DATA_NEW_EXTRADATA,
                                           flv->new_extradata[stream_type],
                                           flv->new_extradata_size[stream_type]);
@@ -1315,6 +1348,9 @@ retry_duration:
     if (stream_type == FLV_STREAM_TYPE_AUDIO &&
                     (sample_rate != flv->last_sample_rate ||
                      channels    != flv->last_channels)) {
+        av_log(s, AV_LOG_DEBUG,"flv_read_packet: audio param changed, sample_rate:%d->%d, channels:%d->%d\n",
+                flv->last_sample_rate, sample_rate,
+                flv->last_channels, channels);
         flv->last_sample_rate = sample_rate;
         flv->last_channels    = channels;
         ff_add_param_change(pkt, channels, 0, sample_rate, 0, 0);
