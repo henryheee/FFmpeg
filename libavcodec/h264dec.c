@@ -998,6 +998,7 @@ static int h264_decode_frame(AVCodecContext *avctx, void *data,
         return send_next_delayed_frame(h, pict, got_frame, 0);
 
     if (av_packet_get_side_data(avpkt, AV_PKT_DATA_NEW_EXTRADATA, NULL)) {
+        av_log(avctx, AV_LOG_DEBUG, "h264_decode_frame: decode new sidedata!\n");
         size_t side_size;
         uint8_t *side = av_packet_get_side_data(avpkt, AV_PKT_DATA_NEW_EXTRADATA, &side_size);
         ff_h264_decode_extradata(side, side_size,
@@ -1005,10 +1006,12 @@ static int h264_decode_frame(AVCodecContext *avctx, void *data,
                                  avctx->err_recognition, avctx);
     }
     if (h->is_avc && buf_size >= 9 && buf[0]==1 && buf[2]==0 && (buf[4]&0xFC)==0xFC) {
-        if (is_avcc_extradata(buf, buf_size))
+        if (is_avcc_extradata(buf, buf_size)){
+            av_log(avctx, AV_LOG_DEBUG, "h264_decode_frame: decode new avc header!\n");
             return ff_h264_decode_extradata(buf, buf_size,
                                             &h->ps, &h->is_avc, &h->nal_length_size,
                                             avctx->err_recognition, avctx);
+        }
     }
 
     buf_index = decode_nal_units(h, buf, buf_size);

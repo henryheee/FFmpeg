@@ -332,6 +332,8 @@ void ff_h264_ps_uninit(H264ParamSets *ps)
 int ff_h264_decode_seq_parameter_set(GetBitContext *gb, AVCodecContext *avctx,
                                      H264ParamSets *ps, int ignore_truncation)
 {
+    av_log(avctx, AV_LOG_DEBUG, "ff_h264_decode_seq_parameter_set: ctx:%p\n", avctx);
+
     AVBufferRef *sps_buf;
     int profile_idc, level_idc, constraint_set_flags = 0;
     unsigned int sps_id;
@@ -743,6 +745,8 @@ static void pps_free(void *opaque, uint8_t *data)
 int ff_h264_decode_picture_parameter_set(GetBitContext *gb, AVCodecContext *avctx,
                                          H264ParamSets *ps, int bit_length)
 {
+    av_log(avctx, AV_LOG_DEBUG,"ff_h264_decode_picture_parameter_set: ctx:%p\n", avctx);
+
     AVBufferRef *pps_buf;
     const SPS *sps;
     unsigned int pps_id = get_ue_golomb(gb);

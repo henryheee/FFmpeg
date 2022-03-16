@@ -228,6 +228,11 @@ int avcodec_parameters_copy(AVCodecParameters *dst, const AVCodecParameters *src
 int av_get_audio_frame_duration2(AVCodecParameters *par, int frame_bytes);
 
 /**
+ * Update extradata when receive avc header during streaming
+ */
+int avcodec_parameters_update_extradata(AVCodecParameters *par, uint8_t *extradata, int size);
+
+/**
  * @}
  */
 

@@ -1788,6 +1788,7 @@ static int get_video_frame(VideoState *is, AVFrame *frame)
                     diff - is->frame_last_filter_delay < 0 &&
                     is->viddec.pkt_serial == is->vidclk.serial &&
                     is->videoq.nb_packets) {
+                    av_log(NULL, AV_LOG_WARNING, "get_video_frame: frame_drops_early, pts=%f\n", dpts);
                     is->frame_drops_early++;
                     av_frame_unref(frame);
                     got_picture = 0;
@@ -3049,6 +3050,8 @@ static int read_thread(void *arg)
         } else if (pkt->stream_index == is->subtitle_stream && pkt_in_play_range) {
             packet_queue_put(&is->subtitleq, pkt);
         } else {
+            av_log(NULL, AV_LOG_WARNING, "read_thread: discard packet, idx:%d, pts:%lld\n", 
+                   pkt->stream_index, pkt_ts);
             av_packet_unref(pkt);
         }
     }

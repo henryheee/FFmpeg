@@ -1256,9 +1256,10 @@ static int read_frame_internal(AVFormatContext *s, AVPacket *pkt)
                 avcodec_close(sti->avctx);
                 sti->info->found_decoder = 0;
             }
-
+            av_log(s, AV_LOG_DEBUG, "read_frame_internal: Demuxer context updated\n");
+            
             /* close parser, because it depends on the codec */
-            if (sti->parser && sti->avctx->codec_id != st->codecpar->codec_id) {
+            if (sti->parser) {
                 av_parser_close(sti->parser);
                 sti->parser = NULL;
             }

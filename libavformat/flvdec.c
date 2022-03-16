@@ -1336,7 +1336,21 @@ retry_duration:
     pkt->stream_index = st->index;
     pkt->pos          = pos;
     if (flv->new_extradata[stream_type]) {
-        av_log(s, AV_LOG_DEBUG,"flv_read_packet: new new_extradata for stream type:%d\n", stream_type);
+        av_log(s, AV_LOG_DEBUG,"flv_read_packet: new_extradata for stream:%d\n", stream_type);
+        
+        if(stream_type == FLV_STREAM_TYPE_VIDEO)
+        {
+            av_log(s, AV_LOG_DEBUG,"flv_read_packet: update video codecpar\n");
+
+            int ret = avcodec_parameters_update_extradata(st->codecpar,flv->new_extradata[stream_type],
+                                                            flv->new_extradata_size[stream_type]);
+            if(ret >= 0)
+            {
+                FFStream *sti = ffstream(st);
+                sti->need_context_update = 1;
+            }
+        }
+        
         int ret = av_packet_add_side_data(pkt, AV_PKT_DATA_NEW_EXTRADATA,
                                           flv->new_extradata[stream_type],
                                           flv->new_extradata_size[stream_type]);

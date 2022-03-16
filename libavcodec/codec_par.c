@@ -200,3 +200,22 @@ int avcodec_parameters_to_context(AVCodecContext *codec,
 
     return 0;
 }
+
+int avcodec_parameters_update_extradata(AVCodecParameters *par, uint8_t *extradata, int size)
+{
+    if(!par||!extradata||size<=0) 
+        return AVERROR_INVALIDDATA;
+
+    if(par->extradata)
+    {
+        av_freep(&par->extradata);
+    }
+            
+    par->extradata = av_mallocz(size + AV_INPUT_BUFFER_PADDING_SIZE);
+    if(!par->extradata)
+        return AVERROR(ENOMEM);
+    
+    memcpy(par->extradata, extradata, size);
+    par->extradata_size = size;
+    return 0;
+}

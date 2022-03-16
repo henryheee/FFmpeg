@@ -596,11 +596,12 @@ static int h264_parse(AVCodecParserContext *s,
     int next;
 
     if (!p->got_first) {
-        p->got_first = 1;
         if (avctx->extradata_size) {
+            av_log(avctx, AV_LOG_DEBUG, "h264_parse: decode_extradata\n");
             ff_h264_decode_extradata(avctx->extradata, avctx->extradata_size,
                                      &p->ps, &p->is_avc, &p->nal_length_size,
                                      avctx->err_recognition, avctx);
+            p->got_first = 1;
         }
     }
 
