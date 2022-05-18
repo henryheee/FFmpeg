@@ -27,6 +27,13 @@
 #include "cbs.h"
 #include "sei.h"
 
+#define SEI_EXTRA_DATA_BUFFER_LENGTH  36
+
+enum user_data_unregisted_sub_type {
+    SUB_TYPE_NOMAL = 0,
+    SUB_TYPE_TIMESTAMP,
+    SUB_TYPE_INCREMENT_INDEX,
+};
 
 typedef struct SEIRawFillerPayload {
     uint32_t payload_size;
@@ -45,6 +52,8 @@ typedef struct SEIRawUserDataUnregistered {
     uint8_t     *data;
     AVBufferRef *data_ref;
     size_t       data_length;
+    uint8_t      type;
+    uint8_t      extra_data_buffer[SEI_EXTRA_DATA_BUFFER_LENGTH];
 } SEIRawUserDataUnregistered;
 
 typedef struct SEIRawMasteringDisplayColourVolume {

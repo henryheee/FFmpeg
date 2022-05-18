@@ -20,6 +20,7 @@
 #include "libavutil/display.h"
 #include "libavutil/common.h"
 #include "libavutil/opt.h"
+#include "libavutil/time.h"
 
 #include "bsf.h"
 #include "cbs.h"
@@ -510,6 +511,22 @@ static int h264_metadata_update_fragment(AVBSFContext *bsf, AVPacket *pkt,
     }
 
     if (ctx->sei_user_data && seek_point) {
+
+        if(SUB_TYPE_NOMAL != ctx->sei_user_data_payload.type){
+            memset(ctx->sei_user_data_payload.extra_data_buffer, 0 , SEI_EXTRA_DATA_BUFFER_LENGTH);
+        }
+
+        if(SUB_TYPE_TIMESTAMP == ctx->sei_user_data_payload.type){
+            int64_t timestamp = av_gettime() / 1000;
+            sprintf_s(ctx->sei_user_data_payload.extra_data_buffer, SEI_EXTRA_DATA_BUFFER_LENGTH, "%s%lld", "ts:", timestamp);
+            ctx->sei_user_data_payload.data_length = strlen(ctx->sei_user_data_payload.extra_data_buffer) + 1;
+        }
+        else if(SUB_TYPE_INCREMENT_INDEX == ctx->sei_user_data_payload.type){
+            static unsigned int increment_index = 0;
+            sprintf_s(ctx->sei_user_data_payload.extra_data_buffer, SEI_EXTRA_DATA_BUFFER_LENGTH, "%s%u", "index:", ++increment_index);
+            ctx->sei_user_data_payload.data_length = strlen(ctx->sei_user_data_payload.extra_data_buffer) + 1;
+        }
+
         err = ff_cbs_sei_add_message(ctx->common.output, au, 1,
                                      SEI_TYPE_USER_DATA_UNREGISTERED,
                                      &ctx->sei_user_data_payload, NULL);
@@ -582,6 +599,20 @@ static int h264_metadata_init(AVBSFContext *bsf)
         if (j == 32 && ctx->sei_user_data[i] == '+') {
             udu->data = (uint8_t*)ctx->sei_user_data + i + 1;
             udu->data_length = strlen(udu->data) + 1;
+
+            // process {timestamp}, {increment_index}  
+            if(0 == strcmp(udu->data, "{timestamp}")){
+                udu->type = SUB_TYPE_TIMESTAMP;
+            } else if (0 == strcmp(udu->data, "{increment_index}")){
+                udu->type = SUB_TYPE_INCREMENT_INDEX;
+            } else {
+                udu->type = SUB_TYPE_NOMAL;
+            }
+
+            if(SUB_TYPE_NOMAL != udu->type){
+                udu->data = udu->extra_data_buffer;
+            }
+
         } else {
             av_log(bsf, AV_LOG_ERROR, "Invalid user data: "
                    "must be \"UUID+string\".\n");
