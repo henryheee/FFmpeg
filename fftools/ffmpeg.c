@@ -891,6 +891,9 @@ static void output_packet(OutputFile *of, AVPacket *pkt,
 
     /* apply the output bitstream filters */
     if (ost->bsf_ctx) {
+        InputStream *ifs = input_streams[ost->source_index];
+        ost->bsf_ctx->is_loop_playback = input_files[ifs->file_index]->loop;
+        
         if (pkt->flags & AV_PKT_FLAG_KEY)
             ost->seen_kf = 1;
         ret = av_bsf_send_packet(ost->bsf_ctx, eof ? NULL : pkt);
