@@ -518,12 +518,12 @@ static int h264_metadata_update_fragment(AVBSFContext *bsf, AVPacket *pkt,
 
         if(SUB_TYPE_TIMESTAMP == ctx->sei_user_data_payload.type){
             int64_t timestamp = av_gettime() / 1000;
-            sprintf_s(ctx->sei_user_data_payload.extra_data_buffer, SEI_EXTRA_DATA_BUFFER_LENGTH, "%s%lld", "ts:", timestamp);
+            snprintf(ctx->sei_user_data_payload.extra_data_buffer, SEI_EXTRA_DATA_BUFFER_LENGTH, "%s%lld", "ts:", timestamp);
             ctx->sei_user_data_payload.data_length = strlen(ctx->sei_user_data_payload.extra_data_buffer) + 1;
         }
         else if(SUB_TYPE_INCREMENT_INDEX == ctx->sei_user_data_payload.type){
             static unsigned int increment_index = 0;
-            sprintf_s(ctx->sei_user_data_payload.extra_data_buffer, SEI_EXTRA_DATA_BUFFER_LENGTH, "%s%u", "index:", ++increment_index);
+            snprintf(ctx->sei_user_data_payload.extra_data_buffer, SEI_EXTRA_DATA_BUFFER_LENGTH, "%s%u", "index:", ++increment_index);
             ctx->sei_user_data_payload.data_length = strlen(ctx->sei_user_data_payload.extra_data_buffer) + 1;
         }
 
