@@ -203,7 +203,9 @@ int av_bsf_send_packet(AVBSFContext *ctx, AVPacket *pkt)
     if (!pkt || IS_EMPTY(pkt)) {
         if (pkt)
             av_packet_unref(pkt);
-        bsfi->eof = 1;
+        if(!ctx->is_loop_playback){
+            bsfi->eof = 1;
+        }
         return 0;
     }
 

@@ -85,6 +85,11 @@ typedef struct AVBSFContext {
      * filter in av_bsf_init().
      */
     AVRational time_base_out;
+
+    /**
+     * Indicate the playback type of input file.
+     */
+    int is_loop_playback;
 } AVBSFContext;
 
 typedef struct AVBitStreamFilter {
