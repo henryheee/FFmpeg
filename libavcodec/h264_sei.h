@@ -198,12 +198,13 @@ typedef struct H264SEIContext {
     H264SEIGreenMetaData green_metadata;
     H264SEIAlternativeTransfer alternative_transfer;
     H264SEIFilmGrainCharacteristics film_grain_characteristics;
+    uint8_t enable_print_sei;
 } H264SEIContext;
 
 struct H264ParamSets;
 
 int ff_h264_sei_decode(H264SEIContext *h, GetBitContext *gb,
-                       const struct H264ParamSets *ps, void *logctx);
+                       const struct H264ParamSets *ps, void *logctx, int64_t pts);
 
 /**
  * Reset SEI values at the beginning of the frame.

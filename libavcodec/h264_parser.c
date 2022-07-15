@@ -34,6 +34,7 @@
 #include "libavutil/log.h"
 #include "libavutil/mem.h"
 #include "libavutil/pixfmt.h"
+#include "libavutil/opt.h"
 
 #include "avcodec.h"
 #include "get_bits.h"
@@ -50,6 +51,7 @@
 #include "startcode.h"
 
 typedef struct H264ParseContext {
+    AVClass *class;
     ParseContext pc;
     H264ParamSets ps;
     H264DSPContext h264dsp;
@@ -343,7 +345,7 @@ static inline int parse_nal_units(AVCodecParserContext *s,
                                                  nal.size_bits);
             break;
         case H264_NAL_SEI:
-            ff_h264_sei_decode(&p->sei, &nal.gb, &p->ps, avctx);
+            ff_h264_sei_decode(&p->sei, &nal.gb, &p->ps, avctx, s->pts);
             break;
         case H264_NAL_IDR_SLICE:
             s->key_frame = 1;
@@ -665,6 +667,25 @@ static int h264_parse(AVCodecParserContext *s,
     return next;
 }
 
+
+#define OFFSET(x) offsetof(H264ParseContext, x)
+#define FLAGS (AV_OPT_FLAG_VIDEO_PARAM|AV_OPT_FLAG_BSF_PARAM)
+static const AVOption h264_parser_options[] = {
+
+    { "enable_print_sei", "Enable print sei option",
+        OFFSET(sei.enable_print_sei), AV_OPT_TYPE_BOOL,
+        { .i64 = 0 }, 0, 1, FLAGS},
+    { NULL }
+};
+
+
+static const AVClass h264_parser_class = {
+    .class_name = "h264_parser_set",
+    .item_name  = av_default_item_name,
+    .option     = h264_parser_options,
+    .version    = LIBAVUTIL_VERSION_INT,
+};
+
 static void h264_close(AVCodecParserContext *s)
 {
     H264ParseContext *p = s->priv_data;
@@ -680,6 +701,8 @@ static av_cold int init(AVCodecParserContext *s)
 {
     H264ParseContext *p = s->priv_data;
 
+    av_opt_set_defaults(p);
+
     p->reference_dts = AV_NOPTS_VALUE;
     p->last_frame_num = INT_MAX;
     ff_h264dsp_init(&p->h264dsp, 8, 1);
@@ -689,6 +712,7 @@ static av_cold int init(AVCodecParserContext *s)
 const AVCodecParser ff_h264_parser = {
     .codec_ids      = { AV_CODEC_ID_H264 },
     .priv_data_size = sizeof(H264ParseContext),
+    .priv_class     = &h264_parser_class,
     .parser_init    = init,
     .parser_parse   = h264_parse,
     .parser_close   = h264_close,

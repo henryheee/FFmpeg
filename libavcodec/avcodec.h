@@ -2760,6 +2760,7 @@ enum AVPictureStructure {
 };
 
 typedef struct AVCodecParserContext {
+    AVClass *class;
     void *priv_data;
     const struct AVCodecParser *parser;
     int64_t frame_offset; /* offset of the current frame */
@@ -2921,6 +2922,7 @@ typedef struct AVCodecParserContext {
 typedef struct AVCodecParser {
     int codec_ids[7]; /* several codec IDs are permitted */
     int priv_data_size;
+    const AVClass * priv_class;
     int (*parser_init)(AVCodecParserContext *s);
     /* This callback never returns an error, a negative value means that
      * the frame start was in a previous packet. */

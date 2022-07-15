@@ -354,6 +354,7 @@ static char *afilters = NULL;
 static int autorotate = 1;
 static int find_stream_info = 1;
 static int filter_nbthreads = 0;
+static const char *parser_option_str;
 
 /* current context */
 static int is_full_screen;
@@ -2783,6 +2784,7 @@ static int read_thread(void *arg)
         ret = AVERROR(ENOMEM);
         goto fail;
     }
+    ic->parser_options = parser_option_str;
     ic->interrupt_callback.callback = decode_interrupt_cb;
     ic->interrupt_callback.opaque = is;
     if (!av_dict_get(format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE)) {
@@ -3578,6 +3580,12 @@ static int opt_codec(void *optctx, const char *opt, const char *arg)
    return 0;
 }
 
+static int opt_parser(void *optctx, const char *opt, const char *arg)
+{
+    parser_option_str = arg;
+    return 0;
+}
+
 static int dummy;
 
 static const OptionDef options[] = {
@@ -3633,6 +3641,7 @@ static const OptionDef options[] = {
     { "find_stream_info", OPT_BOOL | OPT_INPUT | OPT_EXPERT, { &find_stream_info },
         "read and decode the streams to fill missing information with heuristics" },
     { "filter_threads", HAS_ARG | OPT_INT | OPT_EXPERT, { &filter_nbthreads }, "number of filter threads per graph" },
+    { "parser", HAS_ARG, { .func_arg = opt_parser }, "options deliver to parser" },
     { NULL, },
 };
 

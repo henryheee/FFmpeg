@@ -1305,6 +1305,11 @@ static int read_frame_internal(AVFormatContext *s, AVPacket *pkt)
                 sti->parser->flags |= PARSER_FLAG_ONCE;
             else if (sti->need_parsing == AVSTREAM_PARSE_FULL_RAW)
                 sti->parser->flags |= PARSER_FLAG_USE_CODEC_TS;
+
+            if(sti->parser && sti->parser->parser->priv_class && s->parser_options){
+                *((AVClass**)sti->parser->priv_data) = sti->parser->parser->priv_class;
+                av_set_options_string(sti->parser->priv_data, s->parser_options, "=", "");
+            }
         }
 
         if (!sti->need_parsing || !sti->parser) {

@@ -1807,6 +1807,8 @@ typedef struct AVFormatContext {
      * @return 0 on success, a negative AVERROR code on failure
      */
     int (*io_close2)(struct AVFormatContext *s, AVIOContext *pb);
+
+    const char * parser_options;
 } AVFormatContext;
 
 /**

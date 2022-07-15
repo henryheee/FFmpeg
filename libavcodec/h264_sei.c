@@ -248,8 +248,57 @@ static int decode_registered_user_data(H264SEIContext *h, GetBitContext *gb,
     return 0;
 }
 
+static int json_quotation_transform(uint8_t *content, int content_length, uint8_t *new_content, int new_content_length)
+{
+    int ret = 0;
+    int quotation_count = 0;
+    for(int index = 0; index < content_length; ++ index){
+        if( content[index] == '"' ){
+            ++quotation_count;
+        }
+    }
+    if(new_content_length < content_length + quotation_count){
+        ret = -1;
+    }
+    else {
+        for(int read_index = 0, write_index = 0; read_index < content_length && write_index < new_content_length; ++read_index, ++write_index){
+            if(content[read_index] == '"'){
+                new_content[write_index] = '\\';
+                ++write_index;
+                new_content[write_index] = content[read_index];
+            } else {
+                new_content[write_index] = content[read_index];
+            }
+        }
+    }
+
+    return ret; 
+}
+
+static void print_user_metadata(int type, uint8_t *sei_str, long pts, void *logctx)
+{
+    static int index = 0;
+    char print_format[] = "{\"sei_type\":%d,\"sei\":\"%s\",\"time\":%ld,\"interval\":%d,\"index\":%d}\r\n";
+
+    if(strlen(sei_str) > 0){
+        int buffer_length = strlen(sei_str) * 2;
+        char *str_buffer =  calloc(buffer_length, sizeof(char));
+
+        if(0 == json_quotation_transform(sei_str, strlen(sei_str), str_buffer, buffer_length)){
+            av_log(logctx, AV_LOG_INFO, print_format, type, str_buffer, pts, 0, index);
+        }else{
+            av_log(logctx, AV_LOG_INFO, print_format, type, sei_str, pts, 0, index);
+        }
+
+        
+
+        free(str_buffer);
+        ++index;
+    }
+}
+
 static int decode_unregistered_user_data(H264SEIUnregistered *h, GetBitContext *gb,
-                                         void *logctx, int size)
+                                         void *logctx, int size, int64_t pts, int print_sei)
 {
     uint8_t *user_data;
     int e, build, i;
@@ -272,6 +321,11 @@ static int decode_unregistered_user_data(H264SEIUnregistered *h, GetBitContext *
         user_data[i] = get_bits(gb, 8);
 
     user_data[i] = 0;
+
+    if(print_sei){
+        print_user_metadata((int)(SEI_TYPE_USER_DATA_UNREGISTERED),  (uint8_t *)(user_data + 16), pts, logctx);
+    }
+    
     buf_ref->size = size;
     h->buf_ref[h->nb_buf_ref++] = buf_ref;
 
@@ -283,6 +337,36 @@ static int decode_unregistered_user_data(H264SEIUnregistered *h, GetBitContext *
 
     return 0;
 }
+
+static int decode_agora_defined_data(GetBitContext *gb, void *logctx, int size, int64_t pts, int print_sei)
+{
+    uint8_t *user_data;
+    int i;
+    AVBufferRef *buf_ref;
+
+    if (size < 1 || size >= INT_MAX - 1)
+        return AVERROR_INVALIDDATA;
+
+    buf_ref = av_buffer_alloc(size + 1);
+    if (!buf_ref)
+        return AVERROR(ENOMEM);
+    user_data = buf_ref->data;
+
+    for (i = 0; i < size; i++)
+        user_data[i] = get_bits(gb, 8);
+
+    user_data[i] = 0;
+    
+    buf_ref->size = size;
+
+    if(print_sei){
+        print_user_metadata((int)(SEI_TYPE_AGORA_DEFINED_DATA), user_data, pts, logctx);
+    }
+
+    return 0;
+}
+
+
 
 static int decode_recovery_point(H264SEIRecoveryPoint *h, GetBitContext *gb, void *logctx)
 {
@@ -461,7 +545,7 @@ static int decode_film_grain_characteristics(H264SEIFilmGrainCharacteristics *h,
 }
 
 int ff_h264_sei_decode(H264SEIContext *h, GetBitContext *gb,
-                       const H264ParamSets *ps, void *logctx)
+                       const H264ParamSets *ps, void *logctx, int64_t pts)
 {
     int master_ret = 0;
 
@@ -501,7 +585,7 @@ int ff_h264_sei_decode(H264SEIContext *h, GetBitContext *gb,
             ret = decode_registered_user_data(h, &gb_payload, logctx, size);
             break;
         case SEI_TYPE_USER_DATA_UNREGISTERED:
-            ret = decode_unregistered_user_data(&h->unregistered, &gb_payload, logctx, size);
+            ret = decode_unregistered_user_data(&h->unregistered, &gb_payload, logctx, size, pts, h->enable_print_sei);
             break;
         case SEI_TYPE_RECOVERY_POINT:
             ret = decode_recovery_point(&h->recovery_point, &gb_payload, logctx);
@@ -523,6 +607,9 @@ int ff_h264_sei_decode(H264SEIContext *h, GetBitContext *gb,
             break;
         case SEI_TYPE_FILM_GRAIN_CHARACTERISTICS:
             ret = decode_film_grain_characteristics(&h->film_grain_characteristics, &gb_payload);
+            break;
+        case SEI_TYPE_AGORA_DEFINED_DATA:
+            ret = decode_agora_defined_data(&gb_payload, logctx, size, pts, h->enable_print_sei);
             break;
         default:
             av_log(logctx, AV_LOG_DEBUG, "unknown SEI type %d\n", type);

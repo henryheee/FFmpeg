@@ -673,7 +673,7 @@ static int decode_nal_units(H264Context *h, const uint8_t *buf, int buf_size)
             avpriv_request_sample(avctx, "data partitioning");
             break;
         case H264_NAL_SEI:
-            ret = ff_h264_sei_decode(&h->sei, &nal->gb, &h->ps, avctx);
+            ret = ff_h264_sei_decode(&h->sei, &nal->gb, &h->ps, avctx, 0);
             h->has_recovery_point = h->has_recovery_point || h->sei.recovery_point.recovery_frame_cnt != -1;
             if (avctx->debug & FF_DEBUG_GREEN_MD)
                 debug_green_metadata(&h->sei.green_metadata, h->avctx);
