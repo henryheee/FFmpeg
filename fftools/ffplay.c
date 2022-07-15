@@ -3582,7 +3582,10 @@ static int opt_codec(void *optctx, const char *opt, const char *arg)
 
 static int opt_parser(void *optctx, const char *opt, const char *arg)
 {
-    parser_option_str = arg;
+    if(0 == strcmp("print_sei", arg)){
+        parser_option_str = "enable_print_sei=true";
+    }
+    
     return 0;
 }
 
