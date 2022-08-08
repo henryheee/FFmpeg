@@ -2223,6 +2223,8 @@ static int hls_read_packet(AVFormatContext *s, AVPacket *pkt)
 
     for (i = 0; i < c->n_playlists; i++) {
         struct playlist *pls = c->playlists[i];
+
+        pls->ctx->parser_options = pls->parent->parser_options;
         /* Make sure we've got one buffered packet from each open playlist
          * stream */
         if (pls->needed && !pls->pkt->data) {
