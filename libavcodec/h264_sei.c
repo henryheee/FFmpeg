@@ -284,13 +284,18 @@ static void print_user_metadata(int type, uint8_t *sei_str, long pts, void *logc
         int buffer_length = strlen(sei_str) * 2;
         char *str_buffer =  calloc(buffer_length, sizeof(char));
 
-        if(0 == json_quotation_transform(sei_str, strlen(sei_str), str_buffer, buffer_length)){
-            av_log(logctx, AV_LOG_INFO, print_format, type, str_buffer, pts, 0, index);
-        }else{
-            av_log(logctx, AV_LOG_INFO, print_format, type, sei_str, pts, 0, index);
-        }
+        // if(0 == json_quotation_transform(sei_str, strlen(sei_str), str_buffer, buffer_length)){
+        //     av_log(logctx, AV_LOG_INFO, print_format, type, str_buffer, pts, 0, index);
+        // }else{
+        //     av_log(logctx, AV_LOG_INFO, print_format, type, sei_str, pts, 0, index);
+        // }
 
-        
+        av_log(logctx, AV_LOG_INFO, "=================================================\n");
+        av_log(logctx, AV_LOG_INFO, "index: %d\n", index);
+        av_log(logctx, AV_LOG_INFO, "type: %d\n", type);
+        av_log(logctx, AV_LOG_INFO, "sei: %s\n", sei_str);
+        av_log(logctx, AV_LOG_INFO, "time: %ld\n", pts);
+        av_log(logctx, AV_LOG_INFO, "=================================================\n");
 
         free(str_buffer);
         ++index;
