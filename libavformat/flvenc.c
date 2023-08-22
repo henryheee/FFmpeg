@@ -34,6 +34,7 @@
 #include "metadata.h"
 #include "libavutil/opt.h"
 #include "libavcodec/put_bits.h"
+#include "libavutil/time.h"
 
 
 static const AVCodecTag flv_video_codec_ids[] = {
@@ -119,6 +120,9 @@ typedef struct FLVContext {
     AVCodecParameters *data_par;
 
     int flags;
+
+    PacketList packet_buffer;
+    int64_t last_write_packet_timestamp;
 } FLVContext;
 
 typedef struct FLVStreamContext {
@@ -829,6 +833,8 @@ end:
     return 0;
 }
 
+
+
 static int flv_write_packet(AVFormatContext *s, AVPacket *pkt)
 {
     AVIOContext *pb      = s->pb;
@@ -840,6 +846,7 @@ static int flv_write_packet(AVFormatContext *s, AVPacket *pkt)
     uint8_t *data = NULL;
     int flags = -1, flags_size, ret = 0;
     int64_t cur_offset = avio_tell(pb);
+
 
     if (par->codec_type == AVMEDIA_TYPE_AUDIO && !pkt->size) {
         av_log(s, AV_LOG_WARNING, "Empty audio Packet\n");
@@ -1037,6 +1044,35 @@ fail:
     return ret;
 }
 
+
+static int flv_write_packet_burst(AVFormatContext *s, AVPacket *pkt){
+    AVIOContext *pb      = s->pb;
+    AVCodecParameters *par = s->streams[pkt->stream_index]->codecpar;
+    FLVContext *flv      = s->priv_data;
+    FLVStreamContext *sc = s->streams[pkt->stream_index]->priv_data;
+    unsigned ts;
+    int size = pkt->size;
+    uint8_t *data = NULL;
+    int flags = -1, flags_size, ret = 0;
+    int64_t cur_offset = avio_tell(pb);
+
+
+    avpriv_packet_list_put(&flv->packet_buffer, pkt, NULL, 0);
+
+    int64_t current_time = av_gettime();
+    if(current_time - flv->last_write_packet_timestamp < 500 * 1000) {
+        return 0;
+    }
+
+    AVPacket packet;
+    while( 0 == avpriv_packet_list_get(&flv->packet_buffer, &packet)){
+        flv_write_packet(s, &packet);
+    }
+
+    flv->last_write_packet_timestamp = current_time;
+    return 0;
+}
+
 static int flv_check_bitstream(AVFormatContext *s, AVStream *st,
                                const AVPacket *pkt)
 {
@@ -1076,7 +1112,7 @@ const AVOutputFormat ff_flv_muxer = {
     .video_codec    = AV_CODEC_ID_FLV1,
     .init           = flv_init,
     .write_header   = flv_write_header,
-    .write_packet   = flv_write_packet,
+    .write_packet   = flv_write_packet_burst,
     .write_trailer  = flv_write_trailer,
     .check_bitstream= flv_check_bitstream,
     .codec_tag      = (const AVCodecTag* const []) {
