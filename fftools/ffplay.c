@@ -356,6 +356,9 @@ static int find_stream_info = 1;
 static int filter_nbthreads = 0;
 static const char *parser_option_str;
 
+static int first_vf_displayed = 0;
+static int64_t open_start_ts = 0;
+
 /* current context */
 static int is_full_screen;
 static int64_t audio_callback_time;
@@ -1355,6 +1358,13 @@ static int video_open(VideoState *is)
 /* display the current picture, if any */
 static void video_display(VideoState *is)
 {
+    int64_t before_ts = 0;
+    if(is->video_st && !first_vf_displayed)
+    {
+        before_ts = av_gettime();
+        av_log(NULL, AV_LOG_DEBUG, "before video_display time:%lld\n", before_ts);
+    }
+
     if (!is->width)
         video_open(is);
 
@@ -1365,6 +1375,14 @@ static void video_display(VideoState *is)
     else if (is->video_st)
         video_image_display(is);
     SDL_RenderPresent(renderer);
+
+    if(is->video_st && !first_vf_displayed)
+    {
+        int64_t after_ts = av_gettime();
+        av_log(NULL, AV_LOG_INFO, "after first video_display time:%lld, duration:%lld, allcost:%lld\n", 
+                after_ts, after_ts-before_ts, after_ts-open_start_ts);
+        first_vf_displayed = 1;
+    }
 }
 
 static double get_clock(Clock *c)
@@ -2763,6 +2781,8 @@ static int read_thread(void *arg)
     int scan_all_pmts_set = 0;
     int64_t pkt_ts;
 
+    open_start_ts = av_gettime();
+
     if (!wait_mutex) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
         ret = AVERROR(ENOMEM);
@@ -2791,12 +2811,16 @@ static int read_thread(void *arg)
         av_dict_set(&format_opts, "scan_all_pmts", "1", AV_DICT_DONT_OVERWRITE);
         scan_all_pmts_set = 1;
     }
+    int64_t before_open_ts = av_gettime();
+    av_log(NULL, AV_LOG_DEBUG, "before avformat_open_input time:%lld\n", before_open_ts);
     err = avformat_open_input(&ic, is->filename, is->iformat, &format_opts);
     if (err < 0) {
         print_error(is->filename, err);
         ret = -1;
         goto fail;
     }
+    int64_t after_open_ts = av_gettime();
+    av_log(NULL, AV_LOG_DEBUG, "after avformat_open_input time:%lld,duration:%lld\n", after_open_ts, after_open_ts-before_open_ts);
     if (scan_all_pmts_set)
         av_dict_set(&format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE);
 
@@ -2815,8 +2839,11 @@ static int read_thread(void *arg)
     if (find_stream_info) {
         AVDictionary **opts = setup_find_stream_info_opts(ic, codec_opts);
         int orig_nb_streams = ic->nb_streams;
-
+        int64_t before_find_ts = av_gettime();
+        av_log(NULL, AV_LOG_DEBUG, "before avformat_find_stream_info time:%lld\n", before_find_ts);
         err = avformat_find_stream_info(ic, opts);
+        int64_t after_find_ts = av_gettime();
+        av_log(NULL, AV_LOG_DEBUG, "after avformat_find_stream_info time:%lld,duration:%lld\n", after_find_ts,after_find_ts-before_find_ts);
 
         for (i = 0; i < orig_nb_streams; i++)
             av_dict_free(&opts[i]);
